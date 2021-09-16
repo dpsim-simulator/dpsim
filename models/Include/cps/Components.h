@@ -36,6 +36,7 @@
 #include <cps/DP/DP_Ph1_Capacitor.h>
 #include <cps/DP/DP_Ph1_CurrentSource.h>
 #include <cps/DP/DP_Ph1_Inductor.h>
+#include <cps/DP/DP_Ph1_ResIndSeries.h>
 #include <cps/DP/DP_Ph1_PiLine.h>
 #include <cps/DP/DP_Ph1_RXLoad.h>
 #include <cps/DP/DP_Ph1_RXLoadSwitch.h>

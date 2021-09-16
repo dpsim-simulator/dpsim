@@ -6,9 +6,11 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  *********************************************************************************/
 
+#include <cmath>
 #include <cps/DP/DP_Ph1_ResIndSeries.h>
 
 using namespace CPS;
+using namespace std;
 
 DP::Ph1::ResIndSeries::ResIndSeries(String uid, String name, Logger::Level logLevel)
 	: SimPowerComp<Complex>(uid, name, logLevel) {
@@ -38,9 +40,9 @@ void DP::Ph1::ResIndSeries::initialize(Matrix frequencies) {
 void DP::Ph1::ResIndSeries::initializeFromNodesAndTerminals(Real frequency) {
 
 	Real omega = 2. * PI * frequency;
-	Complex impedance = { 0, omega * mInductance };
+	mImpedance = { mResistance, omega * mInductance };
 	mIntfVoltage(0,0) = initialSingleVoltage(1) - initialSingleVoltage(0);
-	mIntfCurrent(0,0) = mIntfVoltage(0,0) / impedance;
+	mIntfCurrent(0,0) = mIntfVoltage(0,0) / mImpedance;
 
 	mSLog->info(
 		"\n--- Initialization from powerflow ---"
@@ -62,14 +64,13 @@ void DP::Ph1::ResIndSeries::initVars(Real timeStep) {
 		Real a = timeStep / (2. * mInductance);
 		Real b = timeStep * 2.*PI * mFrequencies(freq,0) / 2.;
 
-		Real equivCondReal = a / (1. + b * b);
-		Real equivCondImag =  -a * b / (1. + b * b);
+		Real equivCondReal = ( a + mResistance * sqrt(a,2) ) / ( sqrt((1.+R*a),2) + sqrt(b,2) );
+		Real equivCondImag =  -a*b / ( sqrt((1.+R*a),2) + sqrt(b,2) );
 		mEquivCond(freq,0) = { equivCondReal, equivCondImag };
-		Real preCurrFracReal = (1. - b * b) / (1. + b * b);
-		Real preCurrFracImag =  (-2. * b) / (1. + b * b);
+		Real preCurrFracReal = ( 1. - sqrt(b,2) + 2*R*a + sqrt((R*a),2) ) / ( sqrt((1.+R*a),2) + sqrt(b,2) );
+		Real preCurrFracImag =  ( -2.*b -2.*a*b*R ) / ( sqrt((1.+R*a),2) + sqrt(b,2) );
 		mPrevCurrFac(freq,0) = { preCurrFracReal, preCurrFracImag };
 
-		// TODO: check if this is correct or if it should be only computed before the step
 		mEquivCurrent(freq,0) = mEquivCond(freq,0) * mIntfVoltage(0,freq) + mPrevCurrFac(freq,0) * mIntfCurrent(0,freq);
 		mIntfCurrent(0,freq) = mEquivCond(freq,0) * mIntfVoltage(0,freq) + mEquivCurrent(freq,0);
 	}
@@ -94,17 +95,6 @@ void DP::Ph1::ResIndSeries::mnaInitialize(Real omega, Real timeStep, Attribute<M
 		Logger::phasorToString(mIntfVoltage(0,0)),
 		Logger::phasorToString(mIntfCurrent(0,0)),
 		Logger::complexToString(mEquivCurrent(0,0)));
-}
-
-void DP::Ph1::ResIndSeries::mnaInitializeHarm(Real omega, Real timeStep, std::vector<Attribute<Matrix>::Ptr> leftVectors) {
-	MNAInterface::mnaInitialize(omega, timeStep);
-	updateMatrixNodeIndices();
-
-	initVars(timeStep);
-
-	mMnaTasks.push_back(std::make_shared<MnaPreStepHarm>(*this));
-	mMnaTasks.push_back(std::make_shared<MnaPostStepHarm>(*this, leftVectors));
-	mRightVector = Matrix::Zero(leftVectors[0]->get().rows(), mNumFreqs);
 }
 
 void DP::Ph1::ResIndSeries::mnaApplySystemMatrixStamp(Matrix& systemMatrix) {
@@ -134,31 +124,6 @@ void DP::Ph1::ResIndSeries::mnaApplySystemMatrixStamp(Matrix& systemMatrix) {
 	}
 }
 
-void DP::Ph1::ResIndSeries::mnaApplySystemMatrixStampHarm(Matrix& systemMatrix, Int freqIdx) {
-		if (terminalNotGrounded(0))
-			Math::addToMatrixElement(systemMatrix, matrixNodeIndex(0), matrixNodeIndex(0), mEquivCond(freqIdx,0));
-		if (terminalNotGrounded(1))
-			Math::addToMatrixElement(systemMatrix, matrixNodeIndex(1), matrixNodeIndex(1), mEquivCond(freqIdx,0));
-		if (terminalNotGrounded(0) && terminalNotGrounded(1)) {
-			Math::addToMatrixElement(systemMatrix, matrixNodeIndex(0), matrixNodeIndex(1), -mEquivCond(freqIdx,0));
-			Math::addToMatrixElement(systemMatrix, matrixNodeIndex(1), matrixNodeIndex(0), -mEquivCond(freqIdx,0));
-		}
-
-		mSLog->info("-- Stamp frequency {:d} ---", freqIdx);
-		if (terminalNotGrounded(0))
-			mSLog->info("Add {:f}+j{:f} to system at ({:d},{:d})",
-				mEquivCond(freqIdx,0).real(), mEquivCond(freqIdx,0).imag(), matrixNodeIndex(0), matrixNodeIndex(0));
-		if (terminalNotGrounded(1))
-			mSLog->info("Add {:f}+j{:f} to system at ({:d},{:d})",
-				mEquivCond(freqIdx,0).real(), mEquivCond(freqIdx,0).imag(), matrixNodeIndex(1), matrixNodeIndex(1));
-		if ( terminalNotGrounded(0)  &&  terminalNotGrounded(1) ) {
-			mSLog->info("Add {:f}+j{:f} to system at ({:d},{:d})",
-				-mEquivCond(freqIdx,0).real(), -mEquivCond(freqIdx,0).imag(), matrixNodeIndex(0), matrixNodeIndex(1));
-			mSLog->info("Add {:f}+j{:f} to system at ({:d},{:d})",
-				-mEquivCond(freqIdx,0).real(), -mEquivCond(freqIdx,0).imag(), matrixNodeIndex(1), matrixNodeIndex(0));
-		}
-}
-
 void DP::Ph1::ResIndSeries::mnaApplyRightSideVectorStamp(Matrix& rightVector) {
 	for (Int freq = 0; freq < mNumFreqs; freq++) {
 		// Calculate equivalent current source for next time step
@@ -181,37 +146,30 @@ void DP::Ph1::ResIndSeries::mnaApplyRightSideVectorStamp(Matrix& rightVector) {
 	}
 }
 
-void DP::Ph1::ResIndSeries::mnaApplyRightSideVectorStampHarm(Matrix& rightVector) {
-	for (Int freq = 0; freq < mNumFreqs; freq++) {
-		// Calculate equivalent current source for next time step
-		mEquivCurrent(freq,0) =
-			mEquivCond(freq,0) * mIntfVoltage(0,freq)
-			+ mPrevCurrFac(freq,0) * mIntfCurrent(0,freq);
+void DP::Ph1::ResIndSeries::mnaAddPreStepDependencies(AttributeBase::List &prevStepDependencies,
+	AttributeBase::List &attributeDependencies, AttributeBase::List &modifiedAttributes) {
 
-		if (terminalNotGrounded(0))
-			Math::setVectorElement(rightVector, matrixNodeIndex(0), mEquivCurrent(freq,0), 1, 0, freq);
-		if (terminalNotGrounded(1))
-			Math::setVectorElement(rightVector, matrixNodeIndex(1), -mEquivCurrent(freq,0), 1, 0, freq);
-	}
+	// actually depends on L, but then we'd have to modify the system matrix anyway
+	prevStepDependencies.push_back(this->attribute("v_intf"));
+	prevStepDependencies.push_back(this->attribute("i_intf"));
+	modifiedAttributes.push_back(this->attribute("right_vector"));
 }
 
 void DP::Ph1::ResIndSeries::MnaPreStep::execute(Real time, Int timeStepCount) {
 	mResIndSeries.mnaApplyRightSideVectorStamp(mResIndSeries.mRightVector);
 }
 
-void DP::Ph1::ResIndSeries::MnaPreStepHarm::execute(Real time, Int timeStepCount) {
-	mResIndSeries.mnaApplyRightSideVectorStampHarm(mResIndSeries.mRightVector);
+void DP::Ph1::ResIndSeries::mnaAddPostStepDependencies(AttributeBase::List &prevStepDependencies,
+	AttributeBase::List &attributeDependencies, AttributeBase::List &modifiedAttributes, Attribute<Matrix>::Ptr &leftVector) {
+
+	attributeDependencies.push_back(leftVector);
+	modifiedAttributes.push_back(this->attribute("v_intf"));
+	modifiedAttributes.push_back(this->attribute("i_intf"));
 }
 
 void DP::Ph1::ResIndSeries::MnaPostStep::execute(Real time, Int timeStepCount) {
 	mResIndSeries.mnaUpdateVoltage(*mLeftVector);
 	mResIndSeries.mnaUpdateCurrent(*mLeftVector);
-}
-
-void DP::Ph1::ResIndSeries::MnaPostStepHarm::execute(Real time, Int timeStepCount) {
-	for (Int freq = 0; freq < mResIndSeries.mNumFreqs; freq++)
-		mResIndSeries.mnaUpdateVoltageHarm(*mLeftVectors[freq], freq);
-	mResIndSeries.mnaUpdateCurrentHarm();
 }
 
 void DP::Ph1::ResIndSeries::mnaUpdateVoltage(const Matrix& leftVector) {
@@ -227,47 +185,9 @@ void DP::Ph1::ResIndSeries::mnaUpdateVoltage(const Matrix& leftVector) {
 	}
 }
 
-void DP::Ph1::ResIndSeries::mnaUpdateVoltageHarm(const Matrix& leftVector, Int freqIdx) {
-	// v1 - v0
-	mIntfVoltage(0,freqIdx) = 0;
-	if (terminalNotGrounded(1))
-		mIntfVoltage(0,freqIdx) = Math::complexFromVectorElement(leftVector, matrixNodeIndex(1));
-	if (terminalNotGrounded(0))
-		mIntfVoltage(0,freqIdx) = mIntfVoltage(0,freqIdx) - Math::complexFromVectorElement(leftVector, matrixNodeIndex(0));
-
-	SPDLOG_LOGGER_DEBUG(mSLog, "Voltage {:s}", Logger::phasorToString(mIntfVoltage(0,freqIdx)));
-}
-
 void DP::Ph1::ResIndSeries::mnaUpdateCurrent(const Matrix& leftVector) {
 	for (Int freq = 0; freq < mNumFreqs; freq++) {
 		mIntfCurrent(0,freq) = mEquivCond(freq,0) * mIntfVoltage(0,freq) + mEquivCurrent(freq,0);
 		SPDLOG_LOGGER_DEBUG(mSLog, "Current {:s}", Logger::phasorToString(mIntfCurrent(0,freq)));
 	}
-}
-
-void DP::Ph1::ResIndSeries::mnaUpdateCurrentHarm() {
-	for (Int freq = 0; freq < mNumFreqs; freq++) {
-		mIntfCurrent(0,freq) = mEquivCond(freq,0) * mIntfVoltage(0,freq) + mEquivCurrent(freq,0);
-		SPDLOG_LOGGER_DEBUG(mSLog, "Current {:s}", Logger::phasorToString(mIntfCurrent(0,freq)));
-	}
-}
-
-// #### Tear Methods ####
-void DP::Ph1::ResIndSeries::mnaTearInitialize(Real omega, Real timeStep) {
-	initVars(timeStep);
-}
-
-void DP::Ph1::ResIndSeries::mnaTearApplyMatrixStamp(Matrix& tearMatrix) {
-	Math::addToMatrixElement(tearMatrix, mTearIdx, mTearIdx, 1./mEquivCond(0,0));
-}
-
-void DP::Ph1::ResIndSeries::mnaTearApplyVoltageStamp(Matrix& voltageVector) {
-	mEquivCurrent(0,0) = mEquivCond(0,0) * mIntfVoltage(0,0) + mPrevCurrFac(0,0) * mIntfCurrent(0,0);
-	Math::addToVectorElement(voltageVector, mTearIdx, mEquivCurrent(0,0) / mEquivCond(0,0));
-}
-
-void DP::Ph1::ResIndSeries::mnaTearPostStep(Complex voltage, Complex current) {
-	mIntfVoltage(0, 0) = voltage;
-	mIntfCurrent(0, 0) = mEquivCond(0,0) * voltage + mEquivCurrent(0,0);
-
 }

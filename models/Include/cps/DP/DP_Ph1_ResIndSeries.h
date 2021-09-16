@@ -9,14 +9,12 @@
 #pragma once
 
 #include <cps/SimPowerComp.h>
-#include <cps/Base/Base_Ph1_Inductor.h>
 
 namespace CPS {
 namespace DP {
 namespace Ph1 {
 	/// \brief resistor inductor series element
 	class ResIndSeries :
-		public MNATearInterface,
 		public SimPowerComp<Complex>,
 		public SharedFactory<ResIndSeries> {
 	protected:
@@ -26,6 +24,8 @@ namespace Ph1 {
 		Real mResistance;
 		///Conductance [S]
 		Real mConductance;
+		/// Impedance
+		Real mImpedance;
 		/// DC equivalent current source for harmonics [A]
 		MatrixComp mEquivCurrent;
 		/// Equivalent conductance for harmonics [S]
@@ -37,7 +37,7 @@ namespace Ph1 {
 		ResIndSeries(String uid, String name, Logger::Level logLevel = Logger::Level::off);
 		/// Defines name and log level
 		ResIndSeries(String name, Logger::Level logLevel = Logger::Level::off)
-			: Inductor(name, name, logLevel) { }
+			: ResIndSeries(name, name, logLevel) { }
 
 		// #### General ####
 		/// Sets model specific parameters
@@ -64,30 +64,33 @@ namespace Ph1 {
 		/// Update interface current from MNA system results
 		void mnaUpdateCurrent();
 
+		/// MNA pre step operations
+		void mnaPreStep(Real time, Int timeStepCount);
+		/// MNA post step operations
+		void mnaPostStep(Real time, Int timeStepCount, Attribute<Matrix>::Ptr &leftVector);
+		/// Add MNA pre step dependencies
+		void mnaAddPreStepDependencies(AttributeBase::List &prevStepDependencies, AttributeBase::List &attributeDependencies, AttributeBase::List &modifiedAttributes);
+		/// Add MNA post step dependencies
+		void mnaAddPostStepDependencies(AttributeBase::List &prevStepDependencies, AttributeBase::List &attributeDependencies, AttributeBase::List &modifiedAttributes, Attribute<Matrix>::Ptr &leftVector);
+
 		class MnaPreStep : public Task {
 		public:
-			MnaPreStep(Inductor& ResIndSeries) :
-				Task(inductor.mName + ".MnaPreStep"), mResIndSeries(resIndSeries) {
-				// actually depends on L, but then we'd have to modify the system matrix anyway
-				mModifiedAttributes.push_back(mResIndSeries.attribute("right_vector"));
-				mPrevStepDependencies.push_back(mResIndSeries.attribute("v_intf"));
-				mPrevStepDependencies.push_back(mResIndSeries.attribute("i_intf"));
+			MnaPreStep(ResIndSeries& resIndSeries) :
+				Task(resIndSeries.mName + ".MnaPreStep"), mResIndSeries(resIndSeries) {
+				mResIndSeries.mnaAddPreStepDependencies(mPrevStepDependencies, mAttributeDependencies, mModifiedAttributes);
 			}
-			void execute(Real time, Int timeStepCount);
+			void execute(Real time, Int timeStepCount) { mResIndSeries.mnaPreStep(time, timeStepCount); };
 		private:
 			ResIndSeries& mResIndSeries;
 		};
 
 		class MnaPostStep : public Task {
 		public:
-			MnaPostStep(ResIndSeries& inductor, Attribute<Matrix>::Ptr leftVector) :
-				Task(inductor.mName + ".MnaPostStep"),
-				mResIndSeries(resIndSeries), mLeftVector(leftVector) {
-				mAttributeDependencies.push_back(mLeftVector);
-				mModifiedAttributes.push_back(mResIndSeries.attribute("v_intf"));
-				mModifiedAttributes.push_back(mResIndSeries.attribute("i_intf"));
+			MnaPostStep(ResIndSeries& resIndSeries, Attribute<Matrix>::Ptr leftVector) :
+				Task(resIndSeries.mName + ".MnaPostStep"), mResIndSeries(resIndSeries), mLeftVector(leftVector) {
+				mResIndSeries.mnaAddPostStepDependencies(mPrevStepDependencies, mAttributeDependencies, mModifiedAttributes, mLeftVector);
 			}
-			void execute(Real time, Int timeStepCount);
+			void execute(Real time, Int timeStepCount) { mResIndSeries.mnaPostStep(time, timeStepCount, mLeftVector); };
 		private:
 			ResIndSeries& mResIndSeries;
 			Attribute<Matrix>::Ptr mLeftVector;
