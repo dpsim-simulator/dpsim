@@ -47,7 +47,9 @@ namespace CIMPP {
 	class ExternalNetworkInjection;
 	class EnergyConsumer;
 	class PowerTransformer;
+	class PowerTransformer3W;
 	class EquivalentShunt;
+	class LinearShuntCompensator;
 	class TopologicalNode;
 	class ConductingEquipment;
 };
@@ -147,6 +149,7 @@ namespace CIM {
 		TopologicalPowerComp::Ptr mapExternalNetworkInjection(CIMPP::ExternalNetworkInjection* extnet);
 		/// Returns a shunt
 		TopologicalPowerComp::Ptr mapEquivalentShunt(CIMPP::EquivalentShunt *shunt);
+		TopologicalPowerComp::Ptr mapEquivalentShunt(CIMPP::LinearShuntCompensator *shunt);
 
 		// #### Helper Functions ####
 		/// Determine base voltage associated with object
