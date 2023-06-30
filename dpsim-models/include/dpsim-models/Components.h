@@ -88,6 +88,8 @@
 #include <dpsim-models/EMT/EMT_Ph3_Inductor.h>
 #include <dpsim-models/EMT/EMT_Ph3_AvVoltSourceInverterStateSpace.h>
 #include <dpsim-models/EMT/EMT_Ph3_AvVoltageSourceInverterDQ.h>
+#include <dpsim-models/EMT/EMT_Ph3_VSIVoltageControlDQ.h>
+#include <dpsim-models/EMT/EMT_Ph3_VSIVoltageControlVCO.h>
 #include <dpsim-models/EMT/EMT_Ph3_Resistor.h>
 #include <dpsim-models/EMT/EMT_Ph3_SeriesResistor.h>
 #include <dpsim-models/EMT/EMT_Ph3_SeriesSwitch.h>
@@ -121,7 +123,10 @@
 #include <dpsim-models/Signal/TurbineGovernorType1.h>
 #include <dpsim-models/Signal/FIRFilter.h>
 #include <dpsim-models/Signal/Integrator.h>
+#include <dpsim-models/Signal/VCO.h>
 #include <dpsim-models/Signal/SignalGenerator.h>
 #include <dpsim-models/Signal/SineWaveGenerator.h>
 #include <dpsim-models/Signal/FrequencyRampGenerator.h>
 #include <dpsim-models/Signal/CosineFMGenerator.h>
+#include <dpsim-models/Signal/PowerControllerVSI.h>
+#include <dpsim-models/Signal/VoltageControllerVSI.h>

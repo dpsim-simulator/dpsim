@@ -16,28 +16,16 @@
 
 namespace CPS {
 namespace Signal {
-	class PLL :
+	class VCO :
 		public SimSignalComp,
-		public SharedFactory<PLL> {
+		public SharedFactory<VCO> {
 
 	protected:
-		/// Proportional constant of PI controller
-		Real mKp;
-		/// Integration constant of PI controller
-		Real mKi;
-		/// Nominal frequency
+		
+		/// Nominal frequency (Input)
 		Real mOmegaNom;
 		/// Integration time step
         Real mTimeStep;
-
-		/// matrix A of state space model
-		Matrix mA = Matrix::Zero(2, 2);
-		/// matrix B of state space model
-		Matrix mB = Matrix::Zero(2, 2);
-		/// matrix C of state space model
-		Matrix mC = Matrix::Zero(2, 2);
-		/// matrix D of state space model
-		Matrix mD = Matrix::Zero(2, 2);
 
 	public:
 
@@ -45,27 +33,25 @@ namespace Signal {
 		const Attribute<Real>::Ptr mInputRef;
 
 		/// Previous Input
-        const Attribute<Matrix>::Ptr mInputPrev;
+        const Attribute<Real>::Ptr mInputPrev;
         /// Current Input
-        const Attribute<Matrix>::Ptr mInputCurr;
+        const Attribute<Real>::Ptr mInputCurr;
         /// Previous State
-        const Attribute<Matrix>::Ptr mStatePrev;
+        const Attribute<Real>::Ptr mStatePrev;
         /// Current State
-        const Attribute<Matrix>::Ptr mStateCurr;
+        const Attribute<Real>::Ptr mStateCurr;
         /// Previous Output
-        const Attribute<Matrix>::Ptr mOutputPrev;
+        const Attribute<Real>::Ptr mOutputPrev;
         /// Current Output
-        const Attribute<Matrix>::Ptr mOutputCurr;
+        const Attribute<Real>::Ptr mOutputCurr;
 
-		PLL(String name, Logger::Level logLevel = Logger::Level::off);
-		/// Setter for PLL parameters
-		void setParameters(Real kpPLL, Real kiPLL, Real omegaNom);
+		VCO(String name, Logger::Level logLevel = Logger::Level::off);
+		/// Setter for VCO parameters
+		void setParameters(Real omegaNom);
 		/// Setter for simulation parameters
 		void setSimulationParameters(Real timestep);
 		/// Setter for initial values
-        void setInitialValues(Real input_init, Matrix state_init, Matrix output_init);
-		/// Composition of A, B, C, D matrices based on PLL parameters
-		void composeStateSpaceMatrices();
+        void setInitialValues(Real input_init, Real state_init, Real output_init);
 		/// pre step operations
 		void signalPreStep(Real time, Int timeStepCount);
 		/// step operations
@@ -79,24 +65,24 @@ namespace Signal {
 
         class PreStep : public Task {
         public:
-			PreStep(PLL& pll) :
-                Task(**pll.mName + ".PreStep"), mPLL(pll) {
-					mPLL.signalAddPreStepDependencies(mPrevStepDependencies, mAttributeDependencies, mModifiedAttributes);
+			PreStep(VCO& VCO) :
+                Task(**VCO.mName + ".PreStep"), mVCO(VCO) {
+					mVCO.signalAddPreStepDependencies(mPrevStepDependencies, mAttributeDependencies, mModifiedAttributes);
 			}
-			void execute(Real time, Int timeStepCount) { mPLL.signalPreStep(time, timeStepCount); };
+			void execute(Real time, Int timeStepCount) { mVCO.signalPreStep(time, timeStepCount); };
 		private:
-			PLL& mPLL;
+			VCO& mVCO;
         };
 
 		class Step : public Task {
 		public:
-			Step(PLL& pll) :
-				Task(**pll.mName + ".Step"), mPLL(pll) {
-					mPLL.signalAddStepDependencies(mPrevStepDependencies, mAttributeDependencies, mModifiedAttributes);
+			Step(VCO& VCO) :
+				Task(**VCO.mName + ".Step"), mVCO(VCO) {
+					mVCO.signalAddStepDependencies(mPrevStepDependencies, mAttributeDependencies, mModifiedAttributes);
 			}
-			void execute(Real time, Int timeStepCount) { mPLL.signalStep(time, timeStepCount); };
+			void execute(Real time, Int timeStepCount) { mVCO.signalStep(time, timeStepCount); };
 		private:
-			PLL& mPLL;
+			VCO& mVCO;
 		};
 	};
 }

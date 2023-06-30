@@ -93,6 +93,8 @@ list(APPEND MODELS_SOURCES
 	EMT/EMT_Ph3_SynchronGeneratorIdeal.cpp
 	# EMT/EMT_Ph3_SynchronGeneratorVBRStandalone.cpp
 	EMT/EMT_Ph3_SynchronGeneratorTrStab.cpp
+	EMT/EMT_Ph3_VSIVoltageControlDQ.cpp
+	EMT/EMT_Ph3_VSIVoltageControlVCO.cpp
 
 	SP/SP_Ph1_VoltageSource.cpp
 	SP/SP_Ph1_Capacitor.cpp
@@ -133,8 +135,10 @@ list(APPEND MODELS_SOURCES
 	Signal/TurbineGovernor.cpp
 	Signal/TurbineGovernorType1.cpp
 	Signal/PLL.cpp
+	Signal/VCO.cpp
 	Signal/Integrator.cpp
 	Signal/PowerControllerVSI.cpp
+	Signal/VoltageControllerVSI.cpp
 	Signal/SineWaveGenerator.cpp
 	Signal/SignalGenerator.cpp
 	Signal/FrequencyRampGenerator.cpp

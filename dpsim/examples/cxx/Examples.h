@@ -518,6 +518,64 @@ namespace SGIB {
         // Further parameters
         Real systemOmega = 2 * PI * systemFrequency;
     };
+    struct Yazdani {
+
+        // Line parameters (R/X = 1)
+        Real length = 5;
+        Real lineResistance = 0.5 * length;
+	    Real lineInductance = 0.5/314 * length;
+        Real lineCapacitance = 50e-6/314 * length; 
+
+        // Initial state values of VSI system matrix
+        Real thetaPLLInit = 0; 
+        Real phiPLLInit = 0; 
+        Real phi_dInit = 0;
+        Real phi_qInit = 0;
+        Real gamma_dInit = 0;
+        Real gamma_qInit = 0;
+
+        // VSI generated values
+        Real Vdref = 400; //work with Amplitude (*sqrt(3/2))
+        Real Vqref = 0;
+        Real systemFrequency = 60;
+        Real OmegaNull = 2*M_PI*60; //System circular frequency
+
+
+        // VSI filter parameters 
+        Real Lf = 100e-6;
+        Real Cf = 2.5e-3;
+        Real Rf = 2.07e-3;  
+        Real tau = 0.5e-3;
+        Real Rc = 1e-5; //connecting resistor to external network
+      
+
+       // VSI controller parameters
+        Real scaling_P = 1; 
+        Real scaling_I = 1; 
+
+        Real KpVoltageCtrl = 1.6725*scaling_P; 
+        Real KiVoltageCtrl = 374.64*scaling_I; 
+        Real KpCurrCtrl = 0.2*scaling_P; 
+        Real KiCurrCtrl = 4.14*scaling_I; 
+
+
+        // PLL controller parameters
+        // OmegaCutoff is the cutoff-frequency of the PLL filter
+        // in case of VCO-mode use KpPLL=0, KiPLL=0 and OmegaCutoff = OmegaNull to work as VCO
+        Real KpPLL = 0; 
+        Real KiPLL = 0; 
+        Real OmegaCutoff = OmegaNull;
+        
+
+        //Load Parameters
+        Real Res1 = 83e-3;
+        Real Ind1 = 137e-6;
+        Real Res2 = 50e-3;
+        Real Ind2 = 68e-6;
+        Real Cap2 = 13.55e-3;
+    };
+
+
 }
 
 namespace CIGREMV {
@@ -639,6 +697,28 @@ namespace CIGREMV {
         logger->logAttribute(pv->name() + "_vs", pv->attribute("Vs"));
     }
 
+    void logVoltageControlledVSIAttributes(DPsim::DataLogger::Ptr logger, CPS::TopologicalPowerComp::Ptr pv) {
+
+        // voltage controller
+        std::vector<String> inputNames = {  pv->name() + "_voltagectrl_input_vdref", pv->name() + "_voltagectrl_input_vqref",
+                                            pv->name() + "_voltagectrl_input_ircd", pv->name() + "_voltagectrl_input_ircq"};
+        logger->logAttribute(inputNames, pv->attribute("voltagectrl_inputs"));
+        std::vector<String> stateNames = {  pv->name() + "_voltagectrl_state_p", pv->name() + "_voltagectrl_state_q",
+                                            pv->name() + "_voltagectrl_state_phid", pv->name() + "_voltagectrl_state_phiq",
+                                            pv->name() + "_voltagectrl_state_gammad", pv->name() + "_voltagectrl_state_gammaq"};
+        logger->logAttribute(stateNames, pv->attribute("voltagectrl_states"));
+        std::vector<String> outputNames = {  pv->name() + "_voltagectrl_output_vsd", pv->name() + "_voltagectrl_output_vsq"};
+        logger->logAttribute(outputNames, pv->attribute("voltagectrl_outputs"));
+
+        // interface variables
+        logger->logAttribute(pv->name() + "_v_intf", pv->attribute("v_intf"));
+        logger->logAttribute(pv->name() + "_i_intf", pv->attribute("i_intf"));
+
+        // additional variables
+        logger->logAttribute(pv->name() + "_pll_output", pv->attribute("pll_output"));
+        logger->logAttribute(pv->name() + "_vsref", pv->attribute("Vsref"));
+        logger->logAttribute(pv->name() + "_vs", pv->attribute("Vs"));
+    }
 }
 }
 
