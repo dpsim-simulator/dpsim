@@ -30,9 +30,9 @@ SP::Ph1::NetworkInjection::NetworkInjection(String uid, String name,
 	// Create electrical sub components
 	mSubVoltageSource = std::make_shared<SP::Ph1::VoltageSource>(**mName + "_vs", mLogLevel);
 	addMNASubComponent(mSubVoltageSource, MNA_SUBCOMP_TASK_ORDER::TASK_BEFORE_PARENT, MNA_SUBCOMP_TASK_ORDER::TASK_BEFORE_PARENT, true);
-	SPDLOG_LOGGER_INFO(mSLog, "Electrical subcomponents: ");
+	SPDLOG_LOGGER_DEBUG(mSLog, "Electrical subcomponents: ");
 	for (auto subcomp: mSubComponents)
-		SPDLOG_LOGGER_INFO(mSLog, "- {}", subcomp->name());
+		SPDLOG_LOGGER_DEBUG(mSLog, "- {}", subcomp->name());
 
 	// MNA attributes
 	mSubVoltageSource->mVoltageRef->setReference(mVoltageRef);
@@ -133,7 +133,7 @@ void SP::Ph1::NetworkInjection::initializeFromNodesAndTerminals(Real frequency) 
 
 // #### MNA functions ####
 void SP::Ph1::NetworkInjection::mnaParentApplyRightSideVectorStamp(Matrix& rightVector) {
-	SPDLOG_LOGGER_DEBUG(mSLog, "Right Side Vector: {:s}",
+	SPDLOG_LOGGER_TRACE(mSLog, "Right Side Vector: {:s}",
 				Logger::matrixToString(rightVector));
 }
 

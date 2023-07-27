@@ -74,7 +74,7 @@ void DP::Ph1::SynchronGenerator4OrderTPM::specificInitialization() {
 	// initial emf in the dq reference frame
 	(**mEdq_t)(0,0) = (**mVdq)(0,0) - (**mIdq)(1,0) * mLq_t;
 	(**mEdq_t)(1,0) = (**mVdq)(1,0) + (**mIdq)(0,0) * mLd_t;
-	SPDLOG_LOGGER_INFO(mSLog,
+	SPDLOG_LOGGER_DEBUG(mSLog,
 		"\n--- Model specific initialization  ---"
 		"\nInitial Ed_t (per unit): {:f}"
 		"\nInitial Eq_t (per unit): {:f}"
@@ -96,13 +96,13 @@ void DP::Ph1::SynchronGenerator4OrderTPM::calculateConstantConductanceMatrix() {
 	resistanceMatrix(1,0) = - (mA - mB) / 2.0;
 	resistanceMatrix(1,1) = 0;
 
-	SPDLOG_LOGGER_INFO(mSLog, "\nR_const [pu]: {}", Logger::matrixToString(resistanceMatrix));
+	SPDLOG_LOGGER_DEBUG(mSLog, "\nR_const [pu]: {}", Logger::matrixToString(resistanceMatrix));
 
 	resistanceMatrix = resistanceMatrix * mBase_Z;
-	SPDLOG_LOGGER_INFO(mSLog, "\nR_const [Ohm]: {}", Logger::matrixToString(resistanceMatrix));
+	SPDLOG_LOGGER_DEBUG(mSLog, "\nR_const [Ohm]: {}", Logger::matrixToString(resistanceMatrix));
 
 	mConductanceMatrixConst = resistanceMatrix.inverse();
-	SPDLOG_LOGGER_INFO(mSLog, "\nG_const [S]: {}", Logger::matrixToString(mConductanceMatrixConst));
+	SPDLOG_LOGGER_DEBUG(mSLog, "\nG_const [S]: {}", Logger::matrixToString(mConductanceMatrixConst));
 }
 
 void DP::Ph1::SynchronGenerator4OrderTPM::mnaCompApplySystemMatrixStamp(SparseMatrixRow& systemMatrix) {

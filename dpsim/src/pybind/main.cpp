@@ -77,7 +77,7 @@ PYBIND11_MODULE(dpsimpy, m) {
 		.def("get_btf", &DPsim::DirectLinearSolverConfiguration::getBTF);
 
     py::class_<DPsim::Simulation>(m, "Simulation")
-	    .def(py::init<std::string, CPS::Logger::Level>(), "name"_a, "loglevel"_a = CPS::Logger::Level::off)
+	    .def(py::init<std::string, CPS::Logger::Level, CPS::Logger::Level>(), "name"_a, "loglevel"_a = CPS::Logger::Level::info, "cliLevel"_a = CPS::Logger::Level::info)
 		.def("name", &DPsim::Simulation::name)
 		.def("set_time_step", &DPsim::Simulation::setTimeStep)
 		.def("set_final_time", &DPsim::Simulation::setFinalTime)
@@ -104,7 +104,7 @@ PYBIND11_MODULE(dpsimpy, m) {
 		.def("log_lu_times", &DPsim::Simulation::logLUTimes);
 
 	py::class_<DPsim::RealTimeSimulation, DPsim::Simulation>(m, "RealTimeSimulation")
-		.def(py::init<std::string, CPS::Logger::Level>(), "name"_a, "loglevel"_a = CPS::Logger::Level::info)
+		.def(py::init<std::string, CPS::Logger::Level, CPS::Logger::Level>(), "name"_a, "loglevel"_a = CPS::Logger::Level::info, "cliLevel"_a = CPS::Logger::Level::info)
 		.def("name", &DPsim::RealTimeSimulation::name)
 		.def("set_time_step", &DPsim::RealTimeSimulation::setTimeStep)
 		.def("set_final_time", &DPsim::RealTimeSimulation::setFinalTime)
@@ -142,17 +142,9 @@ PYBIND11_MODULE(dpsimpy, m) {
         .def(py::init<std::string>())
 		.def_static("set_log_dir", &CPS::Logger::setLogDir)
 		.def_static("get_log_dir", &CPS::Logger::logDir)
-		.def("log_attribute", py::overload_cast<const CPS::String&, CPS::AttributeBase::Ptr, CPS::UInt, CPS::UInt>(&DPsim::DataLogger::logAttribute), "name"_a, "attr"_a, "max_cols"_a = 0, "max_rows"_a = 0)
+		.def("log_attribute", py::overload_cast<const CPS::String&, CPS::AttributeBase::Ptr, CPS::UInt, CPS::UInt>(&DPsim::DataLogger::logAttribute), "name"_a, "attr"_a, "max_rows"_a = 0, "max_cols"_a = 0)
 		/// Compatibility method. Might be removed later when the python examples have been fully adapted.
-		.def("log_attribute", py::overload_cast<const std::vector<CPS::String>&, CPS::AttributeBase::Ptr>(&DPsim::DataLogger::logAttribute), "names"_a, "attr"_a)
-		/// Compatibility method. Might be removed later when the python examples have been fully adapted.
-		.def("log_attribute", [](DPsim::DataLogger &logger, const CPS::String &name, const CPS::String &attr, const CPS::IdentifiedObject &comp, CPS::UInt rowsMax, CPS::UInt colsMax) {
-			logger.logAttribute(name, comp.attribute(attr), rowsMax, colsMax);
-		}, "name"_a, "attr"_a, "comp"_a, "rows_max"_a = 0, "cols_max"_a = 0)
-		/// Compatibility method. Might be removed later when the python examples have been fully adapted.;
-		.def("log_attribute", [](DPsim::DataLogger &logger, const std::vector<CPS::String> &names, const CPS::String &attr, const CPS::IdentifiedObject &comp) {
-			logger.logAttribute(names, comp.attribute(attr));
-		});
+		.def("log_attribute", py::overload_cast<const std::vector<CPS::String>&, CPS::AttributeBase::Ptr>(&DPsim::DataLogger::logAttribute), "names"_a, "attr"_a);
 
 	py::class_<CPS::IdentifiedObject, std::shared_ptr<CPS::IdentifiedObject>>(m, "IdentifiedObject")
 		.def("name", &CPS::IdentifiedObject::name)
@@ -246,12 +238,12 @@ PYBIND11_MODULE(dpsimpy, m) {
 
 #ifdef WITH_CIM
 	py::class_<CPS::CIM::Reader>(m, "CIMReader")
-		.def(py::init<std::string, CPS::Logger::Level, CPS::Logger::Level>(), "name"_a, "loglevel"_a = CPS::Logger::Level::info, "comploglevel"_a = CPS::Logger::Level::off)
+		.def(py::init<CPS::Logger::Level, CPS::Logger::Level, CPS::Logger::Level>(), "loglevel"_a = CPS::Logger::Level::info, "cliLevel"_a = CPS::Logger::Level::off, "comploglevel"_a = CPS::Logger::Level::off)
 		.def("loadCIM", (CPS::SystemTopology (CPS::CIM::Reader::*)(CPS::Real, const std::list<CPS::String> &, CPS::Domain, CPS::PhaseType, CPS::GeneratorType)) &CPS::CIM::Reader::loadCIM);
 #endif
 
 	py::class_<CPS::CSVReader>(m, "CSVReader")
-		.def(py::init<std::string, const std::string &, std::map<std::string, std::string> &, CPS::Logger::Level>())
+		.def(py::init<const std::string &, std::map<std::string, std::string> &, CPS::Logger::Level, CPS::Logger::Level>(), "path"_a, "assignlist"_a, "loglevel"_a, "clilevel"_a = CPS::Logger::Level::off)
 		.def("assignLoadProfile", &CPS::CSVReader::assignLoadProfile);
 
 	//Base Classes

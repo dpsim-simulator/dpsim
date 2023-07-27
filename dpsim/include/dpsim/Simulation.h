@@ -73,10 +73,14 @@ namespace DPsim {
 		std::chrono::duration<double> mSimulationCalculationTime;
 
 		// #### Logging ####
-		/// Simulation log level
+		/// Simulation file log level
 		CPS::Logger::Level mLogLevel;
+		/// Simulation cli log level
+		CPS::Logger::Level mCliLevel;
 		/// (Real) time needed for the timesteps
 		std::vector<Real> mStepTimes;
+		/// Map of data loggers. mLoggers[**mName] corresponds to the default simulation logger
+		std::map<String, DataLogger::Ptr, std::less<>> mDataLoggers;
 
 		// #### Solver Settings ####
 		///
@@ -120,7 +124,8 @@ namespace DPsim {
 		/// List of all tasks to be scheduled
 		CPS::Task::List mTasks;
 		/// Task dependencies as incoming / outgoing edges
-		Scheduler::Edges mTaskInEdges, mTaskOutEdges;
+		Scheduler::Edges mTaskInEdges;
+		Scheduler::Edges mTaskOutEdges;
 
 		/// Vector of Interfaces
 		std::vector<Interface::Ptr> mInterfaces;
@@ -131,9 +136,6 @@ namespace DPsim {
 			/// Downsampling
 			UInt downsampling;
 		};
-
-		/// The data loggers
-		DataLogger::List mLoggers;
 
 		/// Helper function for constructors
 		void create();
@@ -157,10 +159,10 @@ namespace DPsim {
 		Simulation(String name, CommandLineArgs& args);
 
 		/// Creates simulation with name and log level
-		Simulation(String name, CPS::Logger::Level logLevel = CPS::Logger::Level::info);
+		Simulation(String name, CPS::Logger::Level logLevel = CPS::Logger::Level::info, CPS::Logger::Level cliLevel = CPS::Logger::Level::info);
 
 		/// Desctructor
-		virtual ~Simulation() { }
+		virtual ~Simulation() = default;
 
 		// #### Simulation Settings ####
 		///
@@ -186,7 +188,7 @@ namespace DPsim {
 		///
 		void doSplitSubnets(Bool splitSubnets = true) { **mSplitSubnets = splitSubnets; }
 		///
-		void setTearingComponents(CPS::IdentifiedObject::List tearComponents = CPS::IdentifiedObject::List()) {
+		void setTearingComponents(CPS::IdentifiedObject::List const& tearComponents = CPS::IdentifiedObject::List()) {
 			mTearComponents = tearComponents;
 		}
 		/// Set the scheduling method
@@ -228,19 +230,20 @@ namespace DPsim {
 		void addEvent(Event::Ptr e) {
 			mEvents.addEvent(e);
 		}
-		/// Add a new data logger
+		/// Add a new data logger.
+		/// When the name of the new logger matches the simulation name, the default simulation logger will be replaced!
 		void addLogger(DataLogger::Ptr logger) {
-			mLoggers.push_back(logger);
+			mDataLoggers[logger->name()] = logger;
 		}
+
 		/// Write step time measurements to log file
-		void logStepTimes(String logName);
+		void logStepTimes(const String &logName);
 
 		/// Write LU decomposition times measurements to log file
 		void logLUTimes();
 
 		///
 		void addInterface(Interface::Ptr eint) {
-			eint->setLogger(mLog);
 			mInterfaces.push_back(eint);
 		}
 
@@ -255,20 +258,15 @@ namespace DPsim {
 		Real finalTime() const { return **mFinalTime; }
 		Int timeStepCount() const { return mTimeStepCount; }
 		Real timeStep() const { return **mTimeStep; }
-		DataLogger::List& loggers() { return mLoggers; }
-		std::shared_ptr<Scheduler> scheduler() { return mScheduler; }
+		std::map<String, DataLogger::Ptr, std::less<>> loggers() const { return mDataLoggers; }
+		std::shared_ptr<Scheduler> scheduler() const { return mScheduler; }
 		std::vector<Real>& stepTimes() { return mStepTimes; }
-
-		// #### Set component attributes during simulation ####
-		/// CHECK: Can these be deleted? getIdObjAttribute + "**attr =" should suffice
-		// void setIdObjAttr(const String &comp, const String &attr, Real value);
-		// void setIdObjAttr(const String &comp, const String &attr, Complex value);
 
 		// #### Get component attributes during simulation ####
 		CPS::AttributeBase::Ptr getIdObjAttribute(const String &comp, const String &attr);
 
 		void logIdObjAttribute(const String &comp, const String &attr);
 		/// CHECK: Can we store the attribute name / UID intrinsically inside the attribute?
-		void logAttribute(String name, CPS::AttributeBase::Ptr attr);
+		void logAttribute(const String &name, CPS::AttributeBase::Ptr attr);
 	};
 }

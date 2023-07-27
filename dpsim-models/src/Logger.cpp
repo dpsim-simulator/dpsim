@@ -9,14 +9,14 @@
 #include <memory>
 #include <iomanip>
 
-#include <spdlog/sinks/null_sink.h>
-#include <spdlog/sinks/stdout_color_sinks.h>
-
-#include <dpsim-models/Filesystem.h>
 #include <dpsim-models/Logger.h>
+#include <dpsim-models/Filesystem.h>
 
 using namespace CPS;
 
+std::map<std::string, spdlog::sink_ptr, std::less<>> Logger::mFileSinkRegistry;
+spdlog::sink_ptr Logger::mStdoutSink;
+spdlog::sink_ptr Logger::mStderrSink;
 
 void Logger::setLogLevel(std::shared_ptr<spdlog::logger> logger, Logger::Level level) {
 	logger->set_level(level);
@@ -72,13 +72,13 @@ String Logger::realToString(const Real& num) {
 }
 
 String Logger::prefix() {
-	char *p = getenv("CPS_LOG_PREFIX");
+	char const *p = getenv("CPS_LOG_PREFIX");
 
 	return p ? p : "";
 }
 
 String Logger::logDir() {
-	char *p = getenv("CPS_LOG_DIR");
+	char const *p = getenv("CPS_LOG_DIR");
 
 	return p ? p : "logs";
 }
@@ -96,7 +96,7 @@ void Logger::setLogDir(String path) {
 String Logger::getCSVColumnNames(std::vector<String> names) {
 	std::stringstream ss;
     ss << std::right << std::setw(14) << "time";
-	for (auto name : names) {
+	for (auto const& name : names) {
 		ss << ", " << std::right << std::setw(13) << name;
 	}
 	ss << '\n';
@@ -135,46 +135,93 @@ String Logger::getCSVLineFromData(Real time, const MatrixComp& data) {
 	return ss.str();
 }
 
-Logger::Log Logger::get(const std::string &name, Level filelevel, Level clilevel) {
-	Logger::Log logger = spdlog::get(name);
-
-	if (!logger) {
-		logger = create(name, filelevel, clilevel);
+Logger::Log Logger::get(LoggerType type, const std::string &name, Level filelevel, Level clilevel) {
+	switch (type) {
+		case LoggerType::SIMULATION: {
+			return create(LoggerType::SIMULATION, name, "simulation", filelevel, clilevel);
+		}
+		case LoggerType::COMPONENT: {
+			return create(LoggerType::COMPONENT, name, "components", filelevel, clilevel);
+		}
+		case LoggerType::DEBUG: {
+			return create(LoggerType::DEBUG, name, name, filelevel, clilevel);
+		}
+		default: {
+			// UNREACHABLE!
+			return nullptr;
+		}
 	}
-
-	return logger;
 }
 
-Logger::Log Logger::create(const std::string &name, Level filelevel, Level clilevel) {
+Logger::Log Logger::create(Logger::LoggerType type, const std::string &name, const std::string &fileName, Level filelevel, Level clilevel) {
 	String logDir = Logger::logDir();
-	String filename = logDir + "/" + name + ".log";
-	std::vector<spdlog::sink_ptr> sinks;
-	Logger::Log ret;
-
-	// Create log folder if it does not exist
-	fs::path p = filename;
-	if (p.has_parent_path() && !fs::exists(p.parent_path()))
-		fs::create_directories(p.parent_path());
+	String filepath = logDir + "/" + fileName + ".log";
+	Logger::Log logger;
+	spdlog::sink_ptr file_sink;
 
 	if (clilevel != Logger::Level::off) {
-		auto console_sink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
-		console_sink->set_level(clilevel);
-		console_sink->set_pattern(fmt::format("{}[%T.%f %n %^%l%$] %v", CPS::Logger::prefix()));
-		sinks.push_back(console_sink);
+
+		if (!Logger::mStderrSink) {
+			Logger::mStderrSink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
+			Logger::mStderrSink->set_level(Level::warn);
+			Logger::mStderrSink->set_pattern(fmt::format("{}[%T.%f %n %^%l%$] %v", CPS::Logger::prefix()));
+		}
+
+		if (clilevel < Level::warn && !Logger::mStdoutSink) {
+			Logger::mStdoutSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+			Logger::mStdoutSink->set_level(Level::trace);
+			Logger::mStdoutSink->set_pattern(fmt::format("{}[%T.%f %n %^%l%$] %v", CPS::Logger::prefix()));
+		}
 	}
 
 	if (filelevel != Logger::Level::off) {
-		auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(filename, true);
-		file_sink->set_level(filelevel);
-		file_sink->set_pattern(prefix() + "[%L] %v");
-		sinks.push_back(file_sink);
+		switch (type) {
+			case LoggerType::COMPONENT: //fallthrough;
+			case LoggerType::SIMULATION: {
+				file_sink = Logger::mFileSinkRegistry[filepath];
+				if (!file_sink) {
+					file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(filepath, true);
+					file_sink->set_level(Level::trace);
+					//TODO: Use better prefix
+					file_sink->set_pattern(prefix() + "[%l][%n] %v");
+					Logger::mFileSinkRegistry[filepath] = file_sink;
+				}
+				break;
+			}
+			case LoggerType::DEBUG: {
+				// Create new file sink
+				file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(filepath, true);
+				file_sink->set_level(filelevel);
+				// TODO: Use better prefix
+				file_sink->set_pattern(prefix() + "[%l] %v");
+				break;
+			}
+			default: {
+				// UNREACHABLE!
+			}
+		}
 	}
 
 	if (filelevel == Logger::Level::off && clilevel == Logger::Level::off) {
-		ret = spdlog::create<spdlog::sinks::null_sink_st>(name);
+		auto null_sink = std::make_shared<spdlog::sinks::null_sink_st>();
+		logger = std::make_shared<spdlog::logger>(name, null_sink);
 	} else {
-		ret = std::make_shared<spdlog::logger>(name, begin(sinks), end(sinks));
+		spdlog::sink_ptr dpsimSink = std::make_shared<dpsim_sink>(file_sink, Logger::mStdoutSink, Logger::mStderrSink, filelevel, clilevel);
+		logger = std::make_shared<spdlog::logger>(name, dpsimSink);
 	}
+	logger->set_level(std::min(filelevel, clilevel));
 
-	return ret;
+
+
+	#ifndef DEBUG_BUILD
+		if (filelevel < Level::info || clilevel < Level::info) {
+			SPDLOG_LOGGER_WARN(logger,
+				"This logger has been configured to log at level {} (file) and {} (cli)."
+				" However, because this is a release build, debug logging has been disabled."
+				" Please build in debug mode for extended log output.",
+				spdlog::level::to_string_view(filelevel), spdlog::level::to_string_view(clilevel));
+		}
+	#endif
+
+	return logger;
 }

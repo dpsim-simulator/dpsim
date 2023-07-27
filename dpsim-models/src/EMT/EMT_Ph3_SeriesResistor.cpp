@@ -37,7 +37,7 @@ void EMT::Ph3::SeriesResistor::initializeFromNodesAndTerminals(Real frequency) {
 
 	**mIntfCurrent = **mIntfVoltage / **mResistance;
 
-	SPDLOG_LOGGER_INFO(mSLog, "\n--- Initialization from powerflow ---"
+	SPDLOG_LOGGER_DEBUG(mSLog, "\n--- Initialization from powerflow ---"
 		"\nVoltage across amplitude and phase: \n{}"
 		"\nCurrent amplitude and phase: \n{}"
 		"\nTerminal 0 voltage amplitude and phase: \n{}"
@@ -69,12 +69,12 @@ void EMT::Ph3::SeriesResistor::mnaCompApplySystemMatrixStamp(SparseMatrixRow& sy
 	}
 
 	if (terminalNotGrounded(0))
-		SPDLOG_LOGGER_INFO(mSLog, "Add {} to {}, {}", conductance, matrixNodeIndex(0,0), matrixNodeIndex(0,0));
+		SPDLOG_LOGGER_DEBUG(mSLog, "Add {} to {}, {}", conductance, matrixNodeIndex(0,0), matrixNodeIndex(0,0));
 	if (terminalNotGrounded(1))
-		SPDLOG_LOGGER_INFO(mSLog, "Add {} to {}, {}", conductance, matrixNodeIndex(1,0), matrixNodeIndex(1,0));
+		SPDLOG_LOGGER_DEBUG(mSLog, "Add {} to {}, {}", conductance, matrixNodeIndex(1,0), matrixNodeIndex(1,0));
 	if (terminalNotGrounded(0) && terminalNotGrounded(1)) {
-		SPDLOG_LOGGER_INFO(mSLog, "Add {} to {}, {}", -conductance, matrixNodeIndex(0,0), matrixNodeIndex(1,0));
-		SPDLOG_LOGGER_INFO(mSLog, "Add {} to {}, {}", -conductance, matrixNodeIndex(1,0), matrixNodeIndex(0,0));
+		SPDLOG_LOGGER_DEBUG(mSLog, "Add {} to {}, {}", -conductance, matrixNodeIndex(0,0), matrixNodeIndex(1,0));
+		SPDLOG_LOGGER_DEBUG(mSLog, "Add {} to {}, {}", -conductance, matrixNodeIndex(1,0), matrixNodeIndex(0,0));
 	}
 }
 
@@ -104,11 +104,11 @@ void EMT::Ph3::SeriesResistor::mnaCompUpdateVoltage(const Matrix& leftVector) {
 		(**mIntfVoltage)(2,0) = (**mIntfVoltage)(2,0) - Math::realFromVectorElement(leftVector, matrixNodeIndex(0,2));
 	}
 
-	SPDLOG_LOGGER_DEBUG(mSLog, "Voltage A: {}", (**mIntfVoltage)(0,0));
+	SPDLOG_LOGGER_TRACE(mSLog, "Voltage A: {}", (**mIntfVoltage)(0,0));
 }
 
 void EMT::Ph3::SeriesResistor::mnaCompUpdateCurrent(const Matrix& leftVector) {
 	**mIntfCurrent = **mIntfVoltage / **mResistance;
 
-	SPDLOG_LOGGER_DEBUG(mSLog, "Current A: {} < {}", (**mIntfCurrent)(0,0));
+	SPDLOG_LOGGER_TRACE(mSLog, "Current A: {} < {}", (**mIntfCurrent)(0,0));
 }

@@ -37,7 +37,7 @@ void DP::Ph3::Resistor::initializeFromNodesAndTerminals(Real frequency) {
 		voltMag * sin(voltPhase + 2. / 3. * M_PI));
 	**mIntfCurrent = (**mResistance).inverse() * **mIntfVoltage;
 
-	SPDLOG_LOGGER_INFO(mSLog, "\n--- Initialization from powerflow ---"
+	SPDLOG_LOGGER_DEBUG(mSLog, "\n--- Initialization from powerflow ---"
 		"\nVoltage across amplitude and phase: \n{:s}"
 		"\nCurrent amplitude and phase: \n{:s}"
 		"\nTerminal 0 voltage amplitude and phase: \n{:s}"
@@ -152,11 +152,11 @@ void DP::Ph3::Resistor::mnaCompUpdateVoltage(const Matrix& leftVector) {
 		(**mIntfVoltage)(2,0) = (**mIntfVoltage)(2,0) - Math::complexFromVectorElement(leftVector, matrixNodeIndex(0,2));
 	}
 
-	SPDLOG_LOGGER_DEBUG(mSLog, "Voltage A: {} < {}", std::abs((**mIntfVoltage)(0,0)), std::arg((**mIntfVoltage)(0,0)));
+	SPDLOG_LOGGER_TRACE(mSLog, "Voltage A: {} < {}", std::abs((**mIntfVoltage)(0,0)), std::arg((**mIntfVoltage)(0,0)));
 }
 
 void DP::Ph3::Resistor::mnaCompUpdateCurrent(const Matrix& leftVector) {
 	**mIntfCurrent = (**mResistance).inverse() * **mIntfVoltage;
 
-	SPDLOG_LOGGER_DEBUG(mSLog, "Current A: {} < {}", std::abs((**mIntfCurrent)(0,0)), std::arg((**mIntfCurrent)(0,0)));
+	SPDLOG_LOGGER_TRACE(mSLog, "Current A: {} < {}", std::abs((**mIntfCurrent)(0,0)), std::arg((**mIntfCurrent)(0,0)));
 }

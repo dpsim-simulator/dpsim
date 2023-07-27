@@ -41,11 +41,11 @@ void EMT::Ph3::Capacitor::initializeFromNodesAndTerminals(Real frequency) {
 	**mIntfVoltage = vInitABC.real();
 	**mIntfCurrent = (admittance * vInitABC).real();
 
-	SPDLOG_LOGGER_INFO(mSLog, "\nCapacitance [F]: {:s}"
+	SPDLOG_LOGGER_DEBUG(mSLog, "\nCapacitance [F]: {:s}"
 				"\nAdmittance [S]: {:s}",
 				Logger::matrixToString(**mCapacitance),
 				Logger::matrixCompToString(admittance));
-	SPDLOG_LOGGER_INFO(mSLog,
+	SPDLOG_LOGGER_DEBUG(mSLog,
 		"\n--- Initialization from powerflow ---"
 		"\nVoltage across: {:s}"
 		"\nCurrent: {:s}"
@@ -114,7 +114,7 @@ void EMT::Ph3::Capacitor::mnaCompApplySystemMatrixStamp(SparseMatrixRow& systemM
 		Math::addToMatrixElement(systemMatrix, matrixNodeIndex(1, 2), matrixNodeIndex(0, 2), -mEquivCond(2, 2));
 	}
 
-	SPDLOG_LOGGER_INFO(mSLog,
+	SPDLOG_LOGGER_DEBUG(mSLog,
 			"\nEquivalent Conductance: {:s}",
 			Logger::matrixToString(mEquivCond));
 }
@@ -131,7 +131,7 @@ void EMT::Ph3::Capacitor::mnaCompApplyRightSideVectorStamp(Matrix& rightVector) 
 		Math::setVectorElement(rightVector, matrixNodeIndex(1, 1), -mEquivCurrent(1, 0));
 		Math::setVectorElement(rightVector, matrixNodeIndex(1, 2), -mEquivCurrent(2, 0));
 	}
-	SPDLOG_LOGGER_DEBUG(mSLog,
+	SPDLOG_LOGGER_TRACE(mSLog,
 		"\nEquivalent Current: {:s}",
 		Logger::matrixToString(mEquivCurrent));
 }
@@ -175,7 +175,7 @@ void EMT::Ph3::Capacitor::mnaCompUpdateVoltage(const Matrix& leftVector) {
 
 void EMT::Ph3::Capacitor::mnaCompUpdateCurrent(const Matrix& leftVector) {
 	**mIntfCurrent = mEquivCond * **mIntfVoltage + mEquivCurrent;
-	SPDLOG_LOGGER_DEBUG(mSLog,
+	SPDLOG_LOGGER_TRACE(mSLog,
 		"\nCurrent: {:s}",
 		Logger::matrixToString(**mIntfCurrent)
 	);

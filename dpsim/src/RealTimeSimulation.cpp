@@ -14,8 +14,8 @@
 using namespace CPS;
 using namespace DPsim;
 
-RealTimeSimulation::RealTimeSimulation(String name, Logger::Level logLevel)
-	: Simulation(name, logLevel), mTimer() {
+RealTimeSimulation::RealTimeSimulation(String name, Logger::Level logLevel, Logger::Level cliLevel)
+	: Simulation(name, logLevel, cliLevel), mTimer() {
 
 	//addAttribute<Int >("overruns", nullptr, [=](){ return mTimer.overruns(); }, Flags::read);
 	//addAttribute<Int >("overruns", nullptr, nullptr, Flags::read);
@@ -29,12 +29,12 @@ void RealTimeSimulation::run(const Timer::StartClock::time_point &startAt) {
 	if (!mInitialized)
 		initialize();
 
-	SPDLOG_LOGGER_INFO(mLog, "Opening interfaces.");
-
-	for (auto intf : mInterfaces)
-		intf->open();
-
-	sync();
+	if (!mInterfaces.empty()) {
+		SPDLOG_LOGGER_DEBUG(mLog, "Opening interfaces.");
+		for (auto intf : mInterfaces)
+			intf->open();
+		sync();
+	}
 
 	auto now_time = std::chrono::system_clock::to_time_t(startAt);
 	SPDLOG_LOGGER_INFO(mLog, "Starting simulation at {} (delta_T = {} seconds)",
@@ -61,8 +61,8 @@ void RealTimeSimulation::run(const Timer::StartClock::time_point &startAt) {
 	for (auto intf : mInterfaces)
 		intf->close();
 
-	for (auto lg : mLoggers)
-		lg->close();
+	for (const auto& [_path, logger] : mDataLoggers)
+		logger->close();
 
 	mTimer.stop();
 }

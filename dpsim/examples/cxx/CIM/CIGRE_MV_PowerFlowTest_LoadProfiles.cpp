@@ -70,10 +70,10 @@ int main(int argc, char** argv){
 		time_end = args.duration;
 	}
 
-    CIM::Reader reader(simName, Logger::Level::info, Logger::Level::off);
+    CIM::Reader reader(Logger::Level::info, Logger::Level::off, Logger::Level::off);
     SystemTopology system = reader.loadCIM(system_freq, filenames, CPS::Domain::SP);
 
-	CSVReader csvreader(simName, loadProfilePath, assignList, Logger::Level::info);
+	CSVReader csvreader(loadProfilePath, assignList, Logger::Level::info);
 	csvreader.assignLoadProfile(system, time_begin, time_step, time_end, CSVReader::Mode::MANUAL);
 
 	auto logger = DPsim::DataLogger::make(simName);

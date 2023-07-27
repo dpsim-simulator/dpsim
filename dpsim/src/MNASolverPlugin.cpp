@@ -19,8 +19,8 @@ namespace DPsim {
 template <typename VarType>
 MnaSolverPlugin<VarType>::MnaSolverPlugin(String pluginName,
 	String name,
-	CPS::Domain domain, CPS::Logger::Level logLevel) :
-    MnaSolverDirect<VarType>(name, domain, logLevel),
+	CPS::Domain domain, CPS::Logger::Level logLevel, CPS::Logger::Level cliLevel) :
+    MnaSolverDirect<VarType>(name, domain, logLevel, cliLevel),
 	mPluginName(pluginName),
 	mPlugin(nullptr),
 	mDlHandle(nullptr)
@@ -39,7 +39,8 @@ MnaSolverPlugin<VarType>::~MnaSolverPlugin() {
 
 extern "C" void pluginLogger(const char * str)
 {
-	CPS::Logger::Log log = CPS::Logger::get("Plugin", CPS::Logger::Level::debug, CPS::Logger::Level::debug);
+	///CHECK: Is it possible to use the normal Solver logger for this?
+	CPS::Logger::Log log = CPS::Logger::get(Logger::LoggerType::SIMULATION, "MNASolverPlugin", CPS::Logger::Level::debug, CPS::Logger::Level::debug);
 	log->info(str);
 }
 

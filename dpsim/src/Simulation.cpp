@@ -13,8 +13,6 @@
 #include <dpsim/PFSolverPowerPolar.h>
 #include <dpsim/DiakopticsSolver.h>
 
-#include <spdlog/sinks/stdout_color_sinks.h>
-
 #ifdef WITH_CIM
   #include <dpsim-models/CIM/Reader.h>
 #endif
@@ -28,13 +26,14 @@
 using namespace CPS;
 using namespace DPsim;
 
-Simulation::Simulation(String name,	Logger::Level logLevel) :
+Simulation::Simulation(String name,	Logger::Level logLevel, Logger::Level cliLevel) :
 	mName(AttributeStatic<String>::make(name)),
 	mFinalTime(AttributeStatic<Real>::make(0.001)),
 	mTimeStep(AttributeStatic<Real>::make(0.001)),
 	mSplitSubnets(AttributeStatic<Bool>::make(true)),
 	mSteadyStateInit(AttributeStatic<Bool>::make(false)),
-	mLogLevel(logLevel)  {
+	mLogLevel(logLevel),
+	mCliLevel(cliLevel)  {
 	create();
 }
 
@@ -54,7 +53,10 @@ Simulation::Simulation(String name, CommandLineArgs& args) :
 
 void Simulation::create() {
 	// Logging
-	mLog = Logger::get(**mName, mLogLevel, std::max(Logger::Level::info, mLogLevel));
+	mLog = Logger::get(Logger::LoggerType::SIMULATION, **mName, mLogLevel, mCliLevel);
+
+	// Create default Data Logger
+	mDataLoggers[**mName] = DataLogger::make(**mName);
 
 	Eigen::setNbThreads(1);
 
@@ -65,18 +67,27 @@ void Simulation::initialize() {
 	if (mInitialized)
 		return;
 
+	for (const auto& [_path, logger] : mDataLoggers)
+		logger->open();
+
 	mSolvers.clear();
 
 	switch (mDomain) {
 	case Domain::SP:
 		// Treat SP as DP
+		SPDLOG_LOGGER_INFO(mLog, "Created simulation in SP domain.");
+		createSolvers<Complex>();
+		break;
 	case Domain::DP:
+		SPDLOG_LOGGER_INFO(mLog, "Created simulation in DP domain.");
 		createSolvers<Complex>();
 		break;
 	case Domain::EMT:
+		SPDLOG_LOGGER_INFO(mLog, "Created simulation in EMT domain.");
 		createSolvers<Real>();
 		break;
 	}
+
 
 	mTime = 0;
 	mTimeStepCount = 0;
@@ -100,7 +111,7 @@ void Simulation::createSolvers() {
 			break;
 #endif /* WITH_SUNDIALS */
 		case Solver::Type::NRP:
-			solver = std::make_shared<PFSolverPowerPolar>(**mName, mSystem, **mTimeStep, mLogLevel);
+			solver = std::make_shared<PFSolverPowerPolar>(**mName, mSystem, **mTimeStep, mLogLevel, mCliLevel);
 			solver->doInitFromNodesAndTerminals(mInitFromNodesAndTerminals);
 			solver->setSolverAndComponentBehaviour(mSolverBehaviour);
 			solver->initialize();
@@ -127,7 +138,7 @@ void Simulation::createSolvers() {
 
 template <typename VarType>
 void Simulation::createMNASolver() {
-	Solver::Ptr	 solver;
+	Solver::Ptr	solver;
 	std::vector<SystemTopology> subnets;
 	// The Diakoptics solver splits the system at a later point.
 	// That is why the system is not split here if tear components exist.
@@ -146,11 +157,11 @@ void Simulation::createMNASolver() {
 		if (mTearComponents.size() > 0) {
 			// Tear components available, use diakoptics
 			solver = std::make_shared<DiakopticsSolver<VarType>>(**mName,
-				subnets[net], mTearComponents, **mTimeStep, mLogLevel);
+				subnets[net], mTearComponents, **mTimeStep, mLogLevel, mCliLevel);
 		} else {
 			// Default case with lu decomposition from mna factory
 			solver = MnaSolverFactory::factory<VarType>(**mName + copySuffix, mDomain,
-												 mLogLevel, mDirectImpl, mSolverPluginName);
+												 mLogLevel, mCliLevel, mDirectImpl, mSolverPluginName);
 			solver->setTimeStep(**mTimeStep);
 			solver->doSteadyStateInit(**mSteadyStateInit);
 			solver->doFrequencyParallelization(mFreqParallel);
@@ -163,6 +174,16 @@ void Simulation::createMNASolver() {
 			solver->setDirectLinearSolverConfiguration(mDirectLinearSolverConfiguration);
 			solver->initialize();
 			solver->setMaxNumberOfIterations(mMaxIterations);
+
+			// Log solver iteration numbers
+			if (mLogLevel < Logger::Level::info) {
+				if (auto mnaSolverDirect = std::dynamic_pointer_cast<MnaSolverDirect<Complex>>(solver)) {
+					mDataLoggers[**mName]->logAttribute("iters" + copySuffix, mnaSolverDirect->mIter);
+				}
+				else if (auto mnaSolverDirect = std::dynamic_pointer_cast<MnaSolverDirect<Real>>(solver)) {
+					mDataLoggers[**mName]->logAttribute("iters" + copySuffix, mnaSolverDirect->mIter);
+				}
+			}
 		}
 		mSolvers.push_back(solver);
 	}
@@ -196,20 +217,20 @@ void Simulation::prepSchedule() {
 		}
 	}
 
-	for (auto logger : mLoggers) {
+	for (const auto& [_path, logger] : mDataLoggers) {
 		mTasks.push_back(logger->getTask());
 	}
 	if (!mScheduler) {
-		mScheduler = std::make_shared<SequentialScheduler>();
+		mScheduler = std::make_shared<SequentialScheduler>(String(), mLogLevel, mCliLevel);
 	}
 	mScheduler->resolveDeps(mTasks, mTaskInEdges, mTaskOutEdges);
 }
 
 void Simulation::schedule() {
-	SPDLOG_LOGGER_INFO(mLog, "Scheduling tasks.");
+	SPDLOG_LOGGER_DEBUG(mLog, "Scheduling tasks.");
 	prepSchedule();
 	mScheduler->createSchedule(mTasks, mTaskInEdges, mTaskOutEdges);
-	SPDLOG_LOGGER_INFO(mLog, "Scheduling done.");
+	SPDLOG_LOGGER_DEBUG(mLog, "Scheduling done.");
 }
 
 #ifdef WITH_GRAPHVIZ
@@ -312,7 +333,7 @@ Graph::Graph Simulation::dependencyGraph() {
 			if (avgTimeWorst > Scheduler::TaskTime(0)) {
 				auto grad = (float) avgTimes[task].count() / avgTimeWorst.count();
 				n->set("fillcolor", CPS::Utils::Rgb::gradient(grad).hex());
-				SPDLOG_LOGGER_INFO(mLog, "{} {}", task->toString(), CPS::Utils::Rgb::gradient(grad).hex());
+				SPDLOG_LOGGER_DEBUG(mLog, "{} {}", task->toString(), CPS::Utils::Rgb::gradient(grad).hex());
 			}
 		}
 		else {
@@ -336,12 +357,12 @@ void Simulation::start() {
 	if (!mInitialized)
 		initialize();
 
-	SPDLOG_LOGGER_INFO(mLog, "Opening interfaces.");
-
-	for (auto intf : mInterfaces)
-		intf->open();
-
-	sync();
+	if (!mInterfaces.empty()) {
+		SPDLOG_LOGGER_DEBUG(mLog, "Opening interfaces.");
+		for (auto intf : mInterfaces)
+			intf->open();
+		sync();
+	}
 
 	SPDLOG_LOGGER_INFO(mLog, "Start simulation: {}", **mName);
 	SPDLOG_LOGGER_INFO(mLog, "Time step: {:e}", **mTimeStep);
@@ -361,8 +382,8 @@ void Simulation::stop() {
 	for (auto intf : mInterfaces)
 		intf->close();
 
-	for (auto lg : mLoggers)
-		lg->close();
+	for (const auto& [_path, logger] : mDataLoggers)
+		logger->close();
 
 	SPDLOG_LOGGER_INFO(mLog, "Simulation finished.");
 	mLog->flush();
@@ -403,8 +424,8 @@ Real Simulation::step() {
 	return mTime;
 }
 
-void Simulation::logStepTimes(String logName) {
-	auto stepTimeLog = Logger::get(logName, Logger::Level::info);
+void Simulation::logStepTimes(const String &logName) {
+	auto stepTimeLog = Logger::get(Logger::LoggerType::DEBUG, logName, Logger::Level::info);
 	Logger::setLogPattern(stepTimeLog, "%v");
 	stepTimeLog->info("step_time");
 
@@ -449,10 +470,6 @@ void Simulation::logIdObjAttribute(const String &comp, const String &attr) {
 	logAttribute(name, attrPtr);
 }
 
-void Simulation::logAttribute(String name, CPS::AttributeBase::Ptr attr) {
-	if (mLoggers.size() > 0) {
-		mLoggers[0]->logAttribute(name, attr);
-	} else {
-		throw SystemError("Cannot log attributes when no logger is configured for this simulation!");
-	}
+void Simulation::logAttribute(const String &name, CPS::AttributeBase::Ptr attr) {
+	mDataLoggers[**mName]->logAttribute(name, attr);
 }

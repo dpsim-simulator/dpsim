@@ -80,7 +80,7 @@ def dpsim():
     files = glob.glob('build/_deps/cim-data-src/CIGRE_MV/NEPLAN/CIGRE_MV_no_tapchanger_With_LoadFlow_Results/*.xml')
     log.info('CIM files: %s', files)
 
-    reader = dpsimpy.CIMReader(name)
+    reader = dpsimpy.CIMReader()
     system = reader.loadCIM(50, files, dpsimpy.Domain.SP, dpsimpy.PhaseType.Single, dpsimpy.GeneratorType.PVNode)
 
     csv_files = glob.glob('build/_deps/profile-data-src/CIGRE_MV_NoTap/load_profiles/')[0]
@@ -107,7 +107,7 @@ def dpsim():
         'LOAD-I-14': 'Load_I_14'
     }
 
-    csvreader = dpsimpy.CSVReader(name, csv_files, assignList, dpsimpy.LogLevel.info)
+    csvreader = dpsimpy.CSVReader(csv_files, assignList, dpsimpy.LogLevel.info)
     csvreader.assignLoadProfile(system, 0, 1, 300, dpsimpy.CSVReaderMode.MANUAL, dpsimpy.CSVReaderFormat.SECONDS)
 
     sim = dpsimpy.RealTimeSimulation(name)
@@ -137,7 +137,7 @@ def dpsim():
             .derive_phase(), (i*2)+1)
 
     for node in system.nodes:
-        logger.log_attribute(node.name()+'.V', 'v', node)
+        logger.log_attribute(node.name()+'.V', node.attr('v'))
 
     return sim, intf
 
