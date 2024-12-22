@@ -37,7 +37,7 @@ class CMakeBuild(build_ext):
             if self.parallel:
                 build_args = ['--', '-j' + str(self.parallel)]
             else:
-                build_args = ['--', '-j4']
+                build_args = ['--', '-j1']
 
         if not os.path.exists(self.build_temp):
             os.makedirs(self.build_temp)
